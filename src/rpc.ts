@@ -3,6 +3,10 @@ interface RPCParams {
     [key: string]: any;
 }
 
+const DEFAULT_HEADERS = {
+    "Content-Type": "application/json",
+}
+
 /**
  * RPC client for Nano node with fallback server support
  */
@@ -72,7 +76,10 @@ class RPC {
             try {
                 const response = await fetch(url, {
                     method: "POST",
-                    headers: this.customHeaders,
+                    headers: {
+                        ...DEFAULT_HEADERS,
+                        ...this.customHeaders,
+                    },
                     body: JSON.stringify(params)
                 });
 
