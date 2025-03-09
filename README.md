@@ -7,13 +7,13 @@ Rewritten by [nx2](https://github.com/nextu1337)
 - Easily send and receive nano with local signature
 - Use your own node or any node provider
 - Auto receive blocks of wallet accounts with websocket
-- Receive all receivable blocks for an account
+- Receive blocks (manually)
 - Create wallet from seed or from random entropy
 - Create derived accounts
 - Suppport custom prefix & decimal for custom network such as Banano or DogeNano
 
 **New Features**
-- Typescript support & refactored code
+- TypeScript support & refactored code
 - Allow multiple nodes for RPC & Work servers for failover
 
 **Installation**  
@@ -36,9 +36,9 @@ const seed = randomBytes(32).toString('hex').toUpperCase();
 
 // initialize wallet
 const wallet = new Wallet({
-    RPC_URL: 'http://127.0.0.1:7076', // if you have multiple nodes, you can provide an array of nodes
-    WORK_URL: ['http://127.0.0.1:7076', 'https://fallback-node.com'], // multiple nodes for failover, singular node passed as string is also valid
-    WS_URL: `ws://127.0.0.1:7078`,
+    rpcUrls: 'http://127.0.0.1:7076', // if you have multiple nodes, you can provide an array of nodes
+    workUrls: ['http://127.0.0.1:7076', 'https://fallback-node.com'], // multiple nodes for failover, singular node passed as string is also valid
+    wsUrl: `ws://127.0.0.1:7078`,
     defaultRep: "nano_1banexkcfuieufzxksfrxqf6xy8e57ry1zdtq9yn7jntzhpwu4pg4hajojmq",
     seed,
 });
