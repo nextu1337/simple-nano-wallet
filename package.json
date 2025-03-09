@@ -26,7 +26,8 @@
   "dependencies": {
     "async-lock": "^1.4.1",
     "multi-nano-web": "^1.8.0",
-    "reconnecting-websocket": "^4.4.0"
+    "reconnecting-websocket": "^4.4.0",
+    "ws": "^8.18.1"
   },
   "devDependencies": {
     "@types/async-lock": "^1.4.2",
