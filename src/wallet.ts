@@ -26,7 +26,7 @@ import {
 const lock = new AsyncLock({ maxPending: 1000 });
 
 class Wallet {
-    private accounts = new Map<string, NanoAccount>();
+    private accountMap = new Map<string, NanoAccount>();
     private lastIndex = 0;
     private readonly rpc: RPC;
     private websocket?: ReconnectingWebSocket;
@@ -44,6 +44,10 @@ class Wallet {
         );
 
         this.initializeWebSocket();
+    }
+
+    get accounts(): string[] {
+        return Array.from(this.accountMap.keys());
     }
 
     //#region Initialization
@@ -110,7 +114,7 @@ class Wallet {
             .map(acc => this.formatAccount(acc));
 
         this.lastIndex += count;
-        newAccounts.forEach(acc => this.accounts.set(acc.address, acc));
+        newAccounts.forEach(acc => this.accountMap.set(acc.address, acc));
         
         this.subscribeToAccounts(newAccounts.map(acc => acc.address));
         return newAccounts.map(acc => acc.address);
@@ -189,7 +193,7 @@ class Wallet {
     }
 
     private getPrivateKey(address: string): string {
-        const account = this.accounts.get(address);
+        const account = this.accountMap.get(address);
         if (!account) throw new AccountNotFoundError(address);
         return account.privateKey;
     }
@@ -208,7 +212,7 @@ class Wallet {
         if (!this.config.autoReceive || message.topic !== 'confirmation') return;
         if (message.message.block.subtype !== 'send') return;
 
-        const account = this.accounts.get(message.message.block.link_as_account);
+        const account = this.accountMap.get(message.message.block.link_as_account);
         if (!account) return;
 
         try {
@@ -262,7 +266,7 @@ class Wallet {
                 throw new MissingConfigurationError('defaultRep');
             }
     
-            const nanoAccount = this.accounts.get(account);
+            const nanoAccount = this.accountMap.get(account);
             if (!nanoAccount) {
                 throw new AccountNotFoundError(account);
             }
@@ -288,7 +292,7 @@ class Wallet {
     //#region Cleanup
     shutdown(): void {
         this.websocket?.close();
-        this.accounts.clear();
+        this.accountMap.clear();
         this.activeSubscriptions.clear();
     }
     //#endregion
