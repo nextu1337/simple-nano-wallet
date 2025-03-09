@@ -28,6 +28,8 @@ const lock = new AsyncLock({ maxPending: 1000 });
 
 class Wallet {
     private accountMap = new Map<string, NanoAccount>();
+    private processedTransactionHashes = new Map<string, Date>(); // In memory cache for processed transaction hashes
+
     private lastIndex = 0;
     private readonly rpc: RPC;
     private websocket?: ReconnectingWebSocket;
@@ -51,6 +53,10 @@ class Wallet {
 
         this.initializeWebSocket();
     }
+
+    // Aliases
+    public send = this.sendFunds;
+    public receive = this.receiveFunds;
 
     //#region Getters
     /**
@@ -88,6 +94,8 @@ class Wallet {
     private initializeWebSocket(): void {
         if (!this.config.wsUrl) return;
 
+        if(this.config.autoReceive === undefined) this.config.autoReceive = true;
+
         this.websocket = new ReconnectingWebSocket(this.config.wsUrl, [], {
             WebSocket: WS,
             maxRetries: 10,
@@ -108,6 +116,8 @@ class Wallet {
         });
 
         this.websocket?.addEventListener('message', (event) => {
+            this.removeOldProcessedTransactions();
+
             try {
                 const message = this.parseWebSocketMessage(event.data);
                 this.handleAutoReceive(message);
@@ -168,7 +178,7 @@ class Wallet {
     //#region Transaction Handling
     /**
      * Send funds from one account to another
-     * @param params Source, destination and amount of the transaction
+     * @param params Source, destination and RAW amount of the transaction
      * @returns Transaction hash if successful
      * @throws AccountError if the source or destination address is invalid
      * @throws TransactionFailedError if the transaction fails
@@ -208,7 +218,7 @@ class Wallet {
     /**
      * Receive receivable funds for an account
      * @param account Account address to receive funds for
-     * @param transaction Receivable transaction to receive
+     * @param transaction Receivable transaction to receive (amount in RAW)
      * @returns Transaction hash if successful
      * @throws AccountError if the account address is invalid
      * @throws TransactionFailedError if the transaction fails
@@ -221,10 +231,13 @@ class Wallet {
             const isNewAccount = !!accountInfo.error;
 
             const blockData = await this.prepareReceiveBlock(account, transaction, accountInfo, isNewAccount);
+
+            // console.log('Receive block data:', blockData);
             const privateKey = this.getPrivateKey(account);
             const signedBlock = block.receive(blockData, privateKey);
             const result = await this.rpc.process(signedBlock, 'receive');
 
+            // console.log('Receive result:', result);
             if (result.hash) return result.hash;
             throw new TransactionFailedError(JSON.stringify(result));
         });
@@ -252,6 +265,15 @@ class Wallet {
     //#endregion
 
     //#region WebSocket Handling
+    private removeOldProcessedTransactions(): void {
+        const now = new Date();
+        this.processedTransactionHashes.forEach((timestamp, hash) => {
+            if (now.getTime() - timestamp.getTime() > 60000) {
+                this.processedTransactionHashes.delete(hash);
+            }
+        });
+    }
+
     private parseWebSocketMessage(data: string): ConfirmationMessage {
         try {
             return JSON.parse(data);
@@ -261,13 +283,18 @@ class Wallet {
     }
 
     private async handleAutoReceive(message: ConfirmationMessage): Promise<void> {
+        // console.log('Handling auto-receive:', message);
         if (!this.config.autoReceive || message.topic !== 'confirmation') return;
         if (message.message.block.subtype !== 'send') return;
+
+        if (this.processedTransactionHashes.has(message.message.hash)) return; // Skip if already processed
+        this.processedTransactionHashes.set(message.message.hash, new Date()); // Add to cache ASAP to prevent duplicate processing
 
         const account = this.accountMap.get(message.message.block.link_as_account);
         if (!account) return;
 
         try {
+            // console.log(`Auto-receiving funds for ${account.address}`);
             await this.receiveFunds(account.address, {
                 hash: message.message.hash,
                 amount: message.message.amount
@@ -286,6 +313,7 @@ class Wallet {
 
     private resubscribeAccounts(): void {
         if (!this.websocket || this.websocket.readyState !== WS.OPEN) return;
+        // console.log('Resubscribing to accounts:', this.activeSubscriptions);
 
         const subscription = {
             action: 'subscribe',
