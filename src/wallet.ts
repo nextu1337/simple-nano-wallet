@@ -22,6 +22,7 @@ import {
   TransactionFailedError,
   WebSocketMessageError,
 } from './errors';
+import { Tools } from './tools';
 
 const lock = new AsyncLock({ maxPending: 1000 });
 
@@ -31,6 +32,7 @@ class Wallet {
     private readonly rpc: RPC;
     private websocket?: ReconnectingWebSocket;
     private activeSubscriptions = new Set<string>();
+    private toolsInstance: Tools;
 
     constructor(
         private readonly config: WalletConfig
@@ -43,13 +45,35 @@ class Wallet {
             config.customHeaders
         );
 
+        this.toolsInstance = new Tools({
+            decimalPlaces: this.config.decimalPlaces ?? 30
+        });
+
         this.initializeWebSocket();
     }
 
+    //#region Getters
+    /**
+     * Get the list of accounts addresses in the wallet
+     */
     get accounts(): string[] {
         return Array.from(this.accountMap.keys());
     }
 
+    /**
+     * Get the map of accounts with their public and private keys, indexed by address
+     */
+    get accountsWithKeys(): Map<string, NanoAccount> {
+        return this.accountMap;
+    }
+
+    /**
+     * Get the tools instance for this wallet, providing utility functions for working with Nano amounts
+     */
+    get tools(): Tools {
+        return this.toolsInstance;
+    }
+    //#endregion
     //#region Initialization
     private validateConfig(): void {
         if (!this.config.rpcUrls || !this.config.workUrls) {
@@ -95,17 +119,30 @@ class Wallet {
     //#endregion
 
     //#region Account Management
+    /**
+     * Initialize the wallet with a specific seed
+     * @returns A new wallet with a random seed and a single account
+     */
     generateWallet(): { seed: string; address: string } {
         const seed = randomBytes(32).toString('hex').toUpperCase();
         return this.initializeWallet(seed);
     }
 
     private initializeWallet(seed: string): { seed: string; address: string } {
+        this.lastIndex = 0;
+        this.accountMap.clear();
+        
         this.config.seed = seed;
+
         const addresses = this.generateAccounts(1);
         return { seed, address: addresses[0] };
     }
 
+    /**
+     * Generate a number of new accounts from the wallet seed
+     * @param count Amount of accounts to generate
+     * @returns List of generated account addresses
+     */
     generateAccounts(count: number): string[] {
         if (!this.config.seed) throw new MissingConfigurationError('Wallet not initialized');
         if (count <= 0 || count > 100) throw new AccountError('Invalid account count');
@@ -129,6 +166,13 @@ class Wallet {
     //#endregion
 
     //#region Transaction Handling
+    /**
+     * Send funds from one account to another
+     * @param params Source, destination and amount of the transaction
+     * @returns Transaction hash if successful
+     * @throws AccountError if the source or destination address is invalid
+     * @throws TransactionFailedError if the transaction fails
+     */
     async sendFunds(params: { 
         source: string; 
         destination: string; 
@@ -161,6 +205,14 @@ class Wallet {
         });
     }
 
+    /**
+     * Receive receivable funds for an account
+     * @param account Account address to receive funds for
+     * @param transaction Receivable transaction to receive
+     * @returns Transaction hash if successful
+     * @throws AccountError if the account address is invalid
+     * @throws TransactionFailedError if the transaction fails
+     */
     async receiveFunds(account: string, transaction: PendingTransaction): Promise<string> {
         this.validateAddress(account);
 
@@ -290,6 +342,9 @@ class Wallet {
     }
     //#endregion
     //#region Cleanup
+    /**
+     * Shutdown the wallet, closing the WebSocket connection and clearing all account data
+     */
     shutdown(): void {
         this.websocket?.close();
         this.accountMap.clear();
