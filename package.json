@@ -1,6 +1,6 @@
 {
   "name": "simple-nano-wallet",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Benskalz' simple-nano-wallet rewritten in TypeScript with some additional features.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
