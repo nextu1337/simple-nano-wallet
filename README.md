@@ -29,10 +29,10 @@ yarn add simple-nano-wallet
 **Usage:**  
 **Create new wallet**
 ```ts
+import { randomBytes } from 'crypto';
 import { Wallet } from 'simple-nano-wallet';
-import { wallet as walletLib} from 'multi-nano-web';
 
-const seed = walletLib.generateLegacy().seed // save & backup it somewhere!
+const seed = randomBytes(32).toString('hex').toUpperCase();
 
 // initialize wallet
 const wallet = new Wallet({
@@ -44,7 +44,8 @@ const wallet = new Wallet({
 });
 
 // Generate 10 derived accounts
-const accounts = wallet.createAccounts(10)
+wallet.createAccounts(10)
+console.log(wallet.accounts)
 // ["nano_3g5hpb4kwqgakt4cx11ftq6xztx1matfhgkmhunj3sx4f4s3nwb6hfi3nts1", ... ]
 ```
 
@@ -54,19 +55,24 @@ To disable this feature, set `autoReceive` to false when initializing the wallet
 
 **Manually Receive**  
 ```ts
-// receive all receivable blocks for an account
-const hashesReceive = await wallet.receiveAll("nano_3g5hpb4kwqgakt4cx11ftq6xztx1matfhgkmhunj3sx4f4s3nwb6hfi3nts1")
+// receive receivable block for an account
+const hash = "A1B2C3D4E5F6..."
+const amount = wallet.tools.megaToRaw(0.001)
+
+await wallet.receiveFunds("nano_3g5hpb4kwqgakt4cx11ftq6xztx1matfhgkmhunj3sx4f4s3nwb6hfi3nts1", { hash, amount })
 ```
 
 **Send**  
 ```ts
 // send 0.001 nano from nano_3g5hp... to nano_3g5hp...
-const hash = await wallet.send({
-    source: "nano_3g5hpb4kwqgakt4cx11ftq6xztx1matfhgkmhunj3sx4f4s3nwb6hfi3nts1", // IMPORTANT: must be in wallet. 
+const hash = await wallet.sendFunds({
+    source: "nano_3g5hpb4kwqgakt4cx11ftq6xztx1matfhgkmhunj3sx4f4s3nwb6hfi3nts1", // IMPORTANT: must be in wallet.accounts. 
     destination: "nano_3g5hpb4kwqgakt4cx11ftq6xztx1matfhgkmhunj3sx4f4s3nwb6hfi3nts1",
-    amount: wallet.megaToRaw(0.001),
+    amount: wallet.tools.megaToRaw(0.001),
 })
-        
+
+console.log(hash)
+// "A1B2C3D4E5F6..."
 ```
 
 **Custom networks**
@@ -77,27 +83,28 @@ const headerAuth = { // custom header for authentification
 
 // DogeNano Wallet
 const walletXDG = new Wallet({
-    RPC_URL: 'https://nodes.nanswap.com/XDG',
-    WORK_URL: 'https://nodes.nanswap.com/XDG',
-    WS_URL: `wss://nodes.nanswap.com/ws/?ticker=XDG&api=${process.env.NODES_API_KEY}`,
+    rpcUrls: 'https://nodes.nanswap.com/XDG',
+    workUrls: 'https://nodes.nanswap.com/XDG',
+    wsUrl: `wss://nodes.nanswap.com/ws/?ticker=XDG&api=${process.env.NODES_API_KEY}`,
     seed: seedXDG,
     defaultRep: "xdg_1e4ecrhmcws6kwiegw8dsbq5jstq7gqj7fspjmgiu11q55s6xnsnp3t9jqxf",
-    prefix: 'xdg_',
-    decimal: 26,
+    addressPrefix: 'xdg_',
+    decimalPlaces: 26,
     customHeaders: headerAuth,
-    wsSubAll: false, 
+    subscribeAll: false, 
 })
+
 // Banano Wallet
 const walletBAN = new Wallet({
-            RPC_URL: 'https://nodes.nanswap.com/BAN',
-            WORK_URL: 'https://nodes.nanswap.com/BAN',
-            WS_URL: `wss://nodes.nanswap.com/ws/?ticker=BAN&api=${process.env.NODES_API_KEY}`,
-            seed: seedBAN,
-            defaultRep: "ban_1banexkcfuieufzxksfrxqf6xy8e57ry1zdtq9yn7jntzhpwu4pg4hajojmq",
-            prefix: 'ban_',
-            decimal: 29,
-            customHeaders: headerAuth,
-            wsSubAll: false
-        })
+    rpcUrls: 'https://nodes.nanswap.com/BAN',
+    workUrls: 'https://nodes.nanswap.com/BAN',
+    wsUrl: `wss://nodes.nanswap.com/ws/?ticker=BAN&api=${process.env.NODES_API_KEY}`,
+    seed: seedBAN,
+    defaultRep: "ban_1banexkcfuieufzxksfrxqf6xy8e57ry1zdtq9yn7jntzhpwu4pg4hajojmq",
+    addressPrefix: 'ban_',
+    decimalPlaces: 29,
+    customHeaders: headerAuth,
+    subscribeAll: false, 
+})
 ```
 Despite the rewrite, this lib is **still** intended for small project (<5000 accounts), for a more scablable system, it is recommended to use a database to store the accounts keys.
