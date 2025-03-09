@@ -220,7 +220,7 @@ class Wallet {
             const accountInfo = await this.rpc.account_info(account);
             const isNewAccount = !!accountInfo.error;
 
-            const blockData = this.prepareReceiveBlock(account, transaction, accountInfo, isNewAccount);
+            const blockData = await this.prepareReceiveBlock(account, transaction, accountInfo, isNewAccount);
             const privateKey = this.getPrivateKey(account);
             const signedBlock = block.receive(blockData, privateKey);
             const result = await this.rpc.process(signedBlock, 'receive');
@@ -300,12 +300,12 @@ class Wallet {
     }
     //#endregion
     //#region Block Preparation
-    private prepareReceiveBlock(
+    private async prepareReceiveBlock(
         account: string,
         transaction: PendingTransaction,
         accountInfo: any,
         isNewAccount: boolean
-    ): any {
+    ): Promise<any> {
         const baseData = {
             toAddress: account,
             transactionHash: transaction.hash,
@@ -328,7 +328,7 @@ class Wallet {
                 walletBalanceRaw: '0',
                 representativeAddress: this.config.defaultRep,
                 frontier: '0'.repeat(64),
-                work: this.rpc.work_generate(nanoAccount.publicKey)
+                work: await this.rpc.work_generate(nanoAccount.publicKey)
             };
         }
     
@@ -337,7 +337,7 @@ class Wallet {
             walletBalanceRaw: accountInfo.balance,
             representativeAddress: accountInfo.representative,
             frontier: accountInfo.frontier,
-            work: this.rpc.work_generate(accountInfo.frontier)
+            work: await this.rpc.work_generate(accountInfo.frontier)
         };
     }
     //#endregion
